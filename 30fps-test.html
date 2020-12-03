@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>30 FPS Test</title>
+    <meta name="description" content="This page simulates the effort of runing a 2.5D browser game.">
+    <link rel="icon" href="data:,">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            border: 0;
+            box-sizing: border-box;
+        }
+        body {
+            text-align: center;
+            background: moccasin;
+        }
+        canvas {
+            border: 1px solid dimgrey;
+        }
+        .text {
+            max-width: 90%;
+            margin: 0 auto;
+            font-family:sans-serif;
+            text-align: justify;
+            text-justify: inter-word;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+    <br>
+    <div class="text">
+        This page simulates the effort of runing a 2.5D browser game.
+        You can get more information <a target="_blank" href="https://www.bobsprite.com/blog/60fps-truth-or-lie">here</a>.
+    </div>
+    <br>
+
+    <canvas id="picture" width="780" height="600"></canvas>
+
+    <script>
+    
+"use strict"
+
+// data ///////////////////////////////////////////////////////////////////////
+
+var map = "" +
+    ".h.wt.tmthhww"  +
+    ".hh.ww.t.w.w."  +
+    ".hwwttwwhhht."  +
+    ".h.wwch.hwh.h"  +
+    ".hhtwww.tt.w."  +
+    "..wwwwtwwhh.w"  +
+    ".hhwwmhmww.ww"  +
+    ".thhthcwmhtht"  +
+    ".thhtmwhhtmt."  +
+    ".w.wwww.ww.tc"  
+
+
+var context 
+var sprites = { }
+var horizontalDisplacement = 0
+
+var loopStarts = [ ]
+var paintDurations = [ ]  
+
+
+// main ///////////////////////////////////////////////////////////////////////
+
+function main() {
+    var canvas = document.getElementById("picture")
+    context = canvas.getContext("2d")
+    context.fillStyle = "black"    
+    context.font = "bold 60px arial"
+    
+    sprites["grass"] = createRectangle(60, 60, "green") 
+    sprites["herb"] = createRectangle( 40, 40, "lightgreen") 
+    sprites["wall"] = createRectangle(60, 80, "grey")  
+    sprites["tree"] = createRectangle(120, 120, "brown")  
+    sprites["missil"] = createRectangle(50, 10, "red")  
+    sprites["creature"] = createRectangle(60, 90, "yellow")  
+    
+    mainLoop()
+}
+
+function mainLoop() {
+    var moment = window.performance.now()
+    
+    paint()
+    registerPaintDuration(window.performance.now() - moment)
+    
+    registerLoopStart(moment)
+    
+    requestAnimationFrame(relax)
+}
+
+function relax() {
+    var moment = window.performance.now()
+    
+    registerLoopStart(moment)
+    
+    requestAnimationFrame(mainLoop)
+}
+
+function registerPaintDuration(duration) {
+    if (paintDurations.length < 40) { paintDurations.push(duration); return }
+    
+    for (var n = 0; n < 39; n++) { paintDurations[n] = paintDurations[n+1] }
+    paintDurations[39] = duration
+}
+
+function registerLoopStart(start) {
+    if (loopStarts.length < 40) { loopStarts.push(start); return }
+    
+    for (var n = 0; n < 39; n++) { loopStarts[n] = loopStarts[n+1] }
+    loopStarts[39] = start
+}
+
+// init ///////////////////////////////////////////////////////////////////////
+
+function createRectangle(width, height, color) {
+    var cnv = document.createElement("canvas")
+    cnv.width = width
+    cnv.height = height
+    var ctx = cnv.getContext("2d")
+    ctx.fillStyle = color
+    ctx.fillRect(0, 0, width, height)
+    return cnv
+}
+
+// paint //////////////////////////////////////////////////////////////////////
+
+function paint() {
+    paintGrass()
+    paintMap()
+    
+    horizontalDisplacement -= 2
+    if (horizontalDisplacement < -179) { horizontalDisplacement = 0 }
+
+    showAveragePaintDuration()
+    showWorstPaintDuration()
+    showAverageFps()
+    showWorstFps()
+}
+
+function paintGrass() {
+    var grass = sprites["grass"]
+    
+    for (var row = 0; row < 10; row++) {
+        for (var col = 0; col < 13; col++) {
+            var x = col * 60
+            var y = row * 60 
+            context.drawImage(grass, x, y)
+        }
+    }
+}
+
+function paintMap() {
+    var x = 0
+    var y = 0
+    var maxX = 720
+    var deltaX = 60
+    var deltaY = 60
+    
+    for (var element of map) {
+        paintElement(element, x, y)
+        x += deltaX
+        if (x > maxX) { x = 0; y += deltaY }
+    }
+}
+
+function paintElement(element, x, y) {
+    var id = translateElement(element)
+    if (id == "") { return }
+    
+    context.drawImage(sprites[id], x + horizontalDisplacement, y)
+}
+
+function translateElement(element) {
+    if (element == "h") { return "herb" }
+    if (element == "w") { return "wall" }
+    if (element == "c") { return "creature" }
+    if (element == "t") { return "tree" }
+    if (element == "m") { return "missil" }
+    return ""
+}
+
+// paint duration /////////////////////////////////////////////////////////////
+
+function showAveragePaintDuration() {
+    if (paintDurations.length < 40) { return }
+
+    var sum = 0
+    for (var n = 0; n < 40; n++) { sum += paintDurations[n] }
+    var average = sum / 40
+    average = Math.round(10 * average) / 10
+    
+    context.fillText(average + " ms", 100, 350)
+}
+
+function showWorstPaintDuration() {
+    if (loopStarts.length < 40) { return }
+
+    var worstDuration = 0
+
+    for (var duration of paintDurations) { 
+        if (duration > worstDuration) { worstDuration = duration }
+    }
+    
+    worstDuration = Math.round(10 * worstDuration) / 10
+    
+    context.fillText(worstDuration + " ms", 100, 500)
+}
+
+// fps ////////////////////////////////////////////////////////////////////////
+
+function showAverageFps() {
+    if (loopStarts.length < 40) { return }
+
+    var delta = loopStarts[39] - loopStarts[0]
+    var average = delta / 39
+    var fps = 1000 / average
+    fps = Math.round(10 * fps) / 10
+    
+    context.fillText(fps + " fps", 450, 350)
+}
+
+function showWorstFps() {
+    if (loopStarts.length < 40) { return }
+
+    var worstDelta = 0
+
+    for (var n = 0; n < 39; n++) { 
+        var a = loopStarts[n]
+        var b = loopStarts[n+1]
+        var delta = b - a
+        if (delta > worstDelta) { worstDelta = delta }
+    }
+    
+    var worstFps = 1000 / worstDelta
+    worstFps = Math.round(10 * worstFps) / 10
+    
+    context.fillText(worstFps + " fps", 450, 500)
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+main()  
+    </script>
+</body>
+</html>
+
